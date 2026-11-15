@@ -16,10 +16,11 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 - T2 [S5] Movement + hero control (buffered turns, tunnel wrap) — inline — done (5 hero tests green)
 - T3 [S5] Chaser AI + state machine (house, leaving, scatter/chase, frightened, eaten) — inline — done (14 chaser/level tests green)
 - T4 [S3,S4,S5] Game session: scoring, levels, bonus, lives, 2-player turns — inline — done (11 game tests green, incl. 2-player alternation)
-- T5 [S2,S5,S6] Renderer, audio, input, screens, app loop — inline — pending
-- T6 [S6] README + final verification (build, tests, browser smoke) — inline — pending
+- T5 [S2,S5,S6] Renderer, audio, input, screens, app loop — inline — done (build ok; browser smoke: title, 2P start, movement, death, level clear → Candy Circuit, level 6 → Ember Forge, fright; no console errors)
+- T6 [S6] README + final verification (build, tests, browser smoke) — inline — done (README; 47 tests, tsc, build green)
 
 ## Log
 
 - L1 (2026-11-14) User request verbatim: "quiero que programes un nuevo comecocos desde 0. Quiero que uses gentle-ai pero quiero que lo hagas de manera autonoma sin pedir permiso hasta el final (una versión jugable). Quiero que sea en 2D y sobre un navegador: ¿qué tecnología y librerías propones? Tiene que poder jugar 1 o dos personas. Además tiene que haber varias pantallas segun las vamos pasando. Lo más similar al juego original posible."
 - L2 Decision: no game engine; pure core logic in `src/core` (testable, deterministic RNG injected), rendering/audio/input adapters around it.
+- L3 Verification: `npm test` 47/47, `tsc --noEmit` clean, `vite build` ok; manual browser smoke via Chrome on dev server. Not covered by automated tests: rendering, audio, input (manual only).

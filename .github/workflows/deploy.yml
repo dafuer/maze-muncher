@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Fallback: every 10 minutes, deploy main if the live site is not up to date.
+  schedule:
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -12,10 +15,30 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      outdated: ${{ steps.compare.outputs.outdated }}
+    steps:
+      - id: compare
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          url="https://${REPO%%/*}.github.io/${REPO#*/}/version.txt"
+          live="$(curl -fsSL "$url?nocache=$(date +%s)" 2>/dev/null | tr -d '[:space:]' || true)"
+          echo "live=${live:-none} main=$GITHUB_SHA"
+          if [ "$live" = "$GITHUB_SHA" ]; then
+            echo "outdated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "outdated=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.outdated == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +49,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: echo "$GITHUB_SHA" > dist/version.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -61,6 +61,17 @@ describe.each(MAZES.map((m, i) => [m.name, i] as const))('maze %s', (_name, inde
     expect(deadEnds).toEqual([]);
   });
 
+  it('only has one-tile-wide corridors (never two parallel pellet lines)', () => {
+    const wide: string[] = [];
+    for (let y = 0; y < maze.height - 1; y++) {
+      for (let x = 0; x < maze.width - 1; x++) {
+        const block = [isOpen(maze, x, y), isOpen(maze, x + 1, y), isOpen(maze, x, y + 1), isOpen(maze, x + 1, y + 1)];
+        if (block.every(Boolean)) wide.push(`${x},${y}`);
+      }
+    }
+    expect(wide).toEqual([]);
+  });
+
   it('connects every open tile and pellet to the hero start', () => {
     const seen = new Set<string>();
     const queue = [maze.heroStart];

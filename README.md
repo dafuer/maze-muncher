@@ -3,7 +3,9 @@
 An original arcade maze-chase game for the browser, built from scratch with
 TypeScript, Vite and the Canvas 2D API. Sounds are synthesized with the Web Audio API.
 
-## Play
+**Play online: https://dafuer.github.io/maze-muncher/**
+
+## Play locally
 
 ```bash
 npm install
@@ -60,3 +62,8 @@ tests        Vitest specs for the core
 
 The core runs at a fixed 60 Hz step and exposes state plus events; the app layer
 draws that state and turns events into sound.
+
+## Deployment
+
+Every push to `main` runs the tests, builds the game and publishes `dist/` to
+GitHub Pages (`.github/workflows/deploy.yml`).

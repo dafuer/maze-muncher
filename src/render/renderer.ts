@@ -314,9 +314,10 @@ export class Renderer {
     this.text(game.maze.name.toUpperCase(), WIDTH / 2, by + 9, game.maze.wallColor, 9);
   }
 
-  /** Like the arcades: the banner shows first at the start of a game, then the chasers appear. */
+  /** The banner shows first at the start of a game or level, then the chasers appear. */
   private showPlayerBanner(game: Game): boolean {
-    return game.phase === 'ready' && game.phaseTimer > 2;
+    if (game.phase !== 'ready' || game.roundKind === 'retry') return false;
+    return game.phaseTimer > (game.roundKind === 'gameStart' ? 2 : 1.4);
   }
 
   private drawMessages(game: Game): void {
@@ -328,7 +329,12 @@ export class Renderer {
 
     if (game.phase === 'ready') {
       if (this.showPlayerBanner(game)) {
-        this.text(multi ? '2 PLAYERS' : 'PLAYER ONE', midX, aboveHouse, '#3ef', 18);
+        if (game.roundKind === 'newLevel') {
+          this.text(`LEVEL ${game.level}`, midX, aboveHouse, '#3ef', 22);
+          this.text(maze.name.toUpperCase(), midX, this.py(maze.door.y + 2), maze.wallColor, 14);
+        } else {
+          this.text(multi ? '2 PLAYERS' : 'PLAYER ONE', midX, aboveHouse, '#3ef', 18);
+        }
       }
       this.text('READY!', midX, belowHouse, '#ff0', 18);
     }

@@ -28,6 +28,9 @@ export type GameEvent =
   | 'levelClear'
   | 'gameOver';
 
+/** Why the current round started: drives the banner shown during 'ready'. */
+export type RoundKind = 'gameStart' | 'newLevel' | 'retry';
+
 export interface PlayerState {
   id: number;
   score: number;
@@ -58,6 +61,7 @@ export const BONUS_DOTS = [70, 170] as const;
 export const PHASE_DURATION = {
   intro: 4.2,
   ready: 2,
+  newLevel: 3.2,
   eatPause: 0.6,
   dying: 2.4,
   levelClear: 2.6,
@@ -97,6 +101,7 @@ export class Game {
   heroes: Hero[] = [];
   phase: Phase = 'ready';
   phaseTimer = PHASE_DURATION.intro;
+  roundKind: RoundKind = 'gameStart';
   level: number;
   /** Keys of pellets (and power pellets) already eaten on the current level. */
   eaten = new Set<number>();
@@ -133,8 +138,7 @@ export class Game {
       lives: START_LIVES,
       extraLifeGiven: false,
     }));
-    this.startRound(false);
-    this.phaseTimer = PHASE_DURATION.intro;
+    this.startRound('gameStart');
     this.events.push('intro');
   }
 
@@ -202,7 +206,9 @@ export class Game {
 
   // ---------------------------------------------------------------- round flow
 
-  private startRound(afterDeath: boolean): void {
+  private startRound(kind: RoundKind): void {
+    const afterDeath = kind === 'retry';
+    this.roundKind = kind;
     this.maze = mazeForLevel(this.level);
     this.config = levelConfig(this.level);
     const spawns = SPAWNS[this.players.length];
@@ -220,7 +226,8 @@ export class Game {
     this.eaterHero = -1;
     this.useGlobalRelease = afterDeath;
     this.phase = 'ready';
-    this.phaseTimer = PHASE_DURATION.ready;
+    this.phaseTimer =
+      kind === 'gameStart' ? PHASE_DURATION.intro : kind === 'newLevel' ? PHASE_DURATION.newLevel : PHASE_DURATION.ready;
     this.releaseByDots();
   }
 
@@ -228,7 +235,7 @@ export class Game {
     this.level += 1;
     this.eaten = new Set();
     this.levelDots = 0;
-    this.startRound(false);
+    this.startRound('newLevel');
   }
 
   private afterDeath(): void {
@@ -239,7 +246,7 @@ export class Game {
       this.events.push('gameOver');
       return;
     }
-    this.startRound(true);
+    this.startRound('retry');
   }
 
   // ---------------------------------------------------------------- simulation

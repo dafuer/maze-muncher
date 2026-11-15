@@ -122,17 +122,33 @@ describe('game flow', () => {
     expect(game.drainEvents()).toContain('gameOver');
   });
 
-  it('clears the level, advances and changes maze on later levels', () => {
+  it('clears the level, advances and changes maze', () => {
     const game = newGame(1, 2);
     untilPlaying(game);
-    const keep = pelletKey(game.maze, 12, 22);
+    const keep = pelletKey(game.maze, game.maze.heroStart.x - 1, game.maze.heroStart.y);
     eatAllPelletsBut(game, keep);
     run(game, 0.1, 'left');
     expect(game.phase).toBe('levelClear');
     run(game, PHASE_DURATION.levelClear + 0.1);
     expect(game.level).toBe(3);
     expect(game.eaten.size).toBe(0);
-    expect(game.maze).toBe(MAZES[1]);
+    expect(game.maze).toBe(MAZES[2]);
+    expect(game.roundKind).toBe('newLevel');
+  });
+
+  it('announces a new level with a longer ready phase, but not after a death', () => {
+    const game = newGame();
+    expect(game.roundKind).toBe('gameStart');
+    untilPlaying(game);
+    eatAllPelletsBut(game, pelletKey(game.maze, 12, 22));
+    run(game, 0.1, 'left');
+    run(game, PHASE_DURATION.levelClear + 0.05);
+    expect(game.phase).toBe('ready');
+    expect(game.roundKind).toBe('newLevel');
+    expect(game.phaseTimer).toBeGreaterThan(PHASE_DURATION.ready);
+    die(game);
+    expect(game.roundKind).toBe('retry');
+    expect(game.phaseTimer).toBeLessThanOrEqual(PHASE_DURATION.ready);
   });
 
   it('shows a bonus item after 70 pellets', () => {
@@ -225,6 +241,19 @@ describe('two players at the same time', () => {
     expect(game.activeHeroIndices()).toEqual([1]);
     for (let i = 0; i < START_LIVES; i++) die(game, 1);
     expect(game.phase).toBe('gameOver');
+  });
+
+  it('both players move on to a new maze together after clearing the level', () => {
+    const game = newGame(2);
+    untilPlaying(game);
+    eatAllPelletsBut(game, pelletKey(game.maze, 11, 22));
+    run(game, 0.15, 'left', 'right');
+    expect(game.phase).toBe('levelClear');
+    run(game, PHASE_DURATION.levelClear + 0.05);
+    expect(game.level).toBe(2);
+    expect(game.maze).toBe(MAZES[1]);
+    expect(game.heroes).toHaveLength(2);
+    expect(game.players.map((p) => p.lives)).toEqual([START_LIVES, START_LIVES]);
   });
 
   it('chasers hunt the nearest hero', () => {

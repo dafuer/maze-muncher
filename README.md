@@ -35,8 +35,8 @@ out and the other keeps playing; the game ends when both are out.
 - Bonus items appear below the house after 70 and 170 pellets.
 - Extra life at 10,000 pts. You start with 3 lives.
 - Side tunnels wrap around and slow the drones down.
-- Levels get faster and power time shorter. The maze changes as you progress:
-  Neon Grid (levels 1-2), Candy Circuit (3-5), Ember Forge (6-9), then they alternate.
+- Every cleared level loads a new maze (Neon Grid → Candy Circuit → Ember Forge →
+  and around again), and each level is faster with shorter power time.
 
 ### The drones
 

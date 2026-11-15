@@ -126,12 +126,9 @@ export const MAZE_DEFINITIONS: readonly MazeDefinition[] = [NEON_GRID, CANDY_CIR
 
 export const MAZES: readonly Maze[] = MAZE_DEFINITIONS.map(parseMaze);
 
-/** Levels 1-2 use maze 0, 3-5 maze 1, 6-9 maze 2, then mazes 1 and 2 alternate every 4 levels. */
+/** Every new level loads the next maze, cycling through all of them. */
 export function mazeIndexForLevel(level: number): number {
-  if (level <= 2) return 0;
-  if (level <= 5) return 1;
-  if (level <= 9) return 2;
-  return Math.floor((level - 10) / 4) % 2 === 0 ? 1 : 2;
+  return (Math.max(1, Math.floor(level)) - 1) % MAZES.length;
 }
 
 export function mazeForLevel(level: number): Maze {

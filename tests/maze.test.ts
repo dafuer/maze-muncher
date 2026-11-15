@@ -90,9 +90,10 @@ describe.each(MAZES.map((m, i) => [m.name, i] as const))('maze %s', (_name, inde
 });
 
 describe('maze rotation per level', () => {
-  it('changes maze as levels are cleared', () => {
-    expect([1, 2, 3, 5, 6, 9, 10, 13, 14, 17].map(mazeIndexForLevel)).toEqual([
-      0, 0, 1, 1, 2, 2, 1, 1, 2, 2,
-    ]);
+  it('loads a different maze on every new level, cycling through all of them', () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map(mazeIndexForLevel)).toEqual([0, 1, 2, 0, 1, 2, 0]);
+    for (let level = 1; level < 30; level++) {
+      expect(mazeIndexForLevel(level + 1)).not.toBe(mazeIndexForLevel(level));
+    }
   });
 });

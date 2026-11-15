@@ -15,7 +15,7 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 - T1 [S1,S2,S4] Scaffold + maze model + 3 original mazes with validity tests — inline — done (17 tests green; RED: dead-end test caught 6 dead ends in Ember Forge)
 - T2 [S5] Movement + hero control (buffered turns, tunnel wrap) — inline — done (5 hero tests green)
 - T3 [S5] Chaser AI + state machine (house, leaving, scatter/chase, frightened, eaten) — inline — done (14 chaser/level tests green)
-- T4 [S3,S4,S5] Game session: scoring, levels, bonus, lives, 2-player turns — inline — pending
+- T4 [S3,S4,S5] Game session: scoring, levels, bonus, lives, 2-player turns — inline — done (11 game tests green, incl. 2-player alternation)
 - T5 [S2,S5,S6] Renderer, audio, input, screens, app loop — inline — pending
 - T6 [S6] README + final verification (build, tests, browser smoke) — inline — pending
 

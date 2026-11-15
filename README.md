@@ -66,7 +66,8 @@ draws that state and turns events into sound.
 ## Deployment
 
 Every push to `main` runs the tests, builds the game and publishes `dist/` to
-GitHub Pages (`.github/workflows/deploy.yml`).
+GitHub Pages (`.github/workflows/deploy.yml`). It can also be started by hand from
+the Actions tab ("Run workflow") or with `gh workflow run deploy.yml`.
 
 ## License
 

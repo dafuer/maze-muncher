@@ -67,3 +67,11 @@ draws that state and turns events into sound.
 
 Every push to `main` runs the tests, builds the game and publishes `dist/` to
 GitHub Pages (`.github/workflows/deploy.yml`).
+
+## License
+
+Code: [MIT](LICENSE) © 2026 David Fuertes.
+
+Font: [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) by CodeMan38,
+licensed under the SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`). It is
+self-hosted, so the game makes no requests to third-party servers.

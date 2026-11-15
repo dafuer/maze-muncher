@@ -22,6 +22,7 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 - T7 [S3] Simultaneous 2-player mode (replaces alternating turns) — inline — done (RED: 15 failing → GREEN 53/53; browser smoke: two heroes, independent arrows/WASD control, P2 death only cost P2 a life)
 - T8 [S4] Maze changes on every level + level banner — inline — done (RED 4 failing → GREEN 55/55; browser: 2P level 1 clear → LEVEL 2 Candy Circuit banner)
 - T9 [S5] One-tile-wide corridors in every maze — inline — done (RED 2 failing → GREEN 58/58; browser: Candy Circuit single corridor above house)
+- T10 Publish on GitHub Pages, self-host font, MIT license — inline — done
 
 ## Log
 
@@ -31,3 +32,4 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 - L4 (2026-11-14) User correction verbatim: "a dos jugadores quiero que salgan dos pacman a la vez y se pueda jugar a la vez las dos personas." → S3 rewritten, T7 opened.
 - L5 (2026-11-14) User correction verbatim: "a dos jugadores nos hemos pasado la primera pantalla pero luego a vuelto a ponernos el siguiente nivel. no hemos dicho que ibamos a tener varios niveles?" Verified: mazeIndexForLevel(2) returned 0 (same maze for levels 1-2 by design). S4 rewritten, T8 opened.
 - L6 (2026-11-14) User correction verbatim: "en el laberinto dos, hay caminos que tienen dos lineas de puntitos. Eso no era así en el juego original. Por cada camino solo tienes una linea de premios. ¿puedes revisar los mapas originales y hacerlo lo más parecido a ellos que sea posible?" Verified: rows 10-11 above the house were parallel corridors in Candy Circuit and Ember Forge. Decision: enforce 1-wide corridors; original layouts are not copied (no recreation of the specific game's levels).
+- L7 (2026-11-15) Published: https://dafuer.github.io/maze-muncher/ (repo dafuer/maze-muncher, Pages via Actions). User approved self-hosting the font (privacy, no Google requests) and the MIT license; feature closed.

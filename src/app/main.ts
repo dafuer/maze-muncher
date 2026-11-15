@@ -1,3 +1,4 @@
+import './fonts.css';
 import { Sound } from '../audio/sound';
 import { Game } from '../core/game';
 import { Input, type Command } from '../input/input';
@@ -111,7 +112,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && screen === 'game') paused = true;
 });
 
-void document.fonts?.ready.then(() => renderer.fit());
+void document.fonts?.load('16px "Press Start 2P"').then(() => renderer.fit());
 requestAnimationFrame(frame);
 
 // Development-only hook for debugging in the browser console.

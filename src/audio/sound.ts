@@ -153,7 +153,7 @@ export class Sound {
       vol = 0.05;
     } else {
       this.loopOsc.type = 'triangle';
-      const rate = 2.2 + game.rageLevel() * 0.8 + game.player.level * 0.05;
+      const rate = 2.2 + game.rageLevel() * 0.8 + game.level * 0.05;
       const phase = (t * rate) % 1;
       freq = 380 + 260 * (phase < 0.5 ? phase * 2 : 2 - phase * 2);
       vol = 0.08;

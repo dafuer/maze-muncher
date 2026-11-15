@@ -3,7 +3,7 @@ import type { Game } from '../core/game';
 import { levelConfig } from '../core/levels';
 import { tileAt, type Maze } from '../core/maze';
 import { MAZES } from '../core/mazes';
-import { drawBonus, drawChaser, drawHero, drawHeroDeath, HERO_COLOR } from './sprites';
+import { drawBonus, drawChaser, drawHero, drawHeroDeath, HERO_COLOR, HERO_COLORS } from './sprites';
 
 export const TILE = 24;
 const HUD_TOP = 3;
@@ -175,7 +175,7 @@ export class Renderer {
       this.text(label, bx + bw / 2, by + bh / 2, blink ? HERO_COLOR : '#fff', 16);
     }
     this.text('PRESS 1 OR 2  ·  TAP A BUTTON', WIDTH / 2, HEIGHT * 0.91, '#aaa', 11);
-    this.text('ARROWS/WASD/SWIPE MOVE · P PAUSE · M SOUND', WIDTH / 2, HEIGHT * 0.94, '#777', 10);
+    this.text('P1 ARROWS/SWIPE · P2 WASD · P PAUSE · M SOUND', WIDTH / 2, HEIGHT * 0.94, '#777', 10);
     this.text(state.muted ? 'SOUND OFF' : 'SOUND ON', WIDTH / 2, HEIGHT * 0.97, state.muted ? '#f66' : '#6f6', 10);
   }
 
@@ -199,7 +199,7 @@ export class Renderer {
       drawBonus(ctx, game.bonus.kind, this.px(game.bonus.pos.x), this.py(game.bonus.pos.y), TILE * 0.7);
     }
 
-    const showActors = game.phase !== 'gameOver' && game.phase !== 'turnOver';
+    const showActors = game.phase !== 'gameOver';
     const dying = game.phase === 'dying';
     if (showActors && game.phase !== 'levelClear') {
       // During the death animation the chasers disappear after a short freeze.
@@ -211,7 +211,7 @@ export class Renderer {
         }
       }
     }
-    if (showActors) this.drawHeroState(game);
+    if (showActors) game.activeHeroIndices().forEach((i) => this.drawHeroState(game, i));
 
     for (const p of game.popups) {
       this.text(p.text, this.px(p.x), this.py(p.y), '#7ff', 13);
@@ -239,20 +239,21 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawHeroState(game: Game): void {
-    const h = game.hero;
+  private drawHeroState(game: Game, index: number): void {
+    const h = game.heroes[index];
+    const color = HERO_COLORS[index] ?? HERO_COLOR;
     const cx = this.px(h.x);
     const cy = this.py(h.y);
-    if (game.phase === 'dying') {
+    if (game.phase === 'dying' && index === game.dyingHero) {
       const freeze = 0.6;
       const elapsed = 2.4 - game.phaseTimer;
-      if (elapsed < freeze) drawHero(this.ctx, cx, cy, TILE * 0.8, h.facing, 0.5);
-      else drawHeroDeath(this.ctx, cx, cy, TILE * 0.8, Math.min(1, (elapsed - freeze) / 1.6));
+      if (elapsed < freeze) drawHero(this.ctx, cx, cy, TILE * 0.8, h.facing, 0.5, color);
+      else drawHeroDeath(this.ctx, cx, cy, TILE * 0.8, Math.min(1, (elapsed - freeze) / 1.6), color);
       return;
     }
-    if (game.phase === 'eatPause') return; // the score popup replaces the hero briefly
+    if (game.phase === 'eatPause' && index === game.eaterHero) return; // the score popup replaces the hero briefly
     const mouth = game.phase === 'playing' ? Math.abs(Math.sin(h.travelled * Math.PI * 1.5)) : 0.6;
-    drawHero(this.ctx, cx, cy, TILE * 0.8, h.facing, mouth);
+    drawHero(this.ctx, cx, cy, TILE * 0.8, h.facing, mouth, color);
   }
 
   private drawPellets(game: Game): void {
@@ -261,14 +262,14 @@ export class Renderer {
     const blink = game.phase !== 'playing' || Math.floor(game.clock * 4) % 2 === 0;
     ctx.fillStyle = maze.pelletColor;
     for (const key of maze.pellets) {
-      if (game.player.eaten.has(key)) continue;
+      if (game.eaten.has(key)) continue;
       const x = key % maze.width;
       const y = Math.floor(key / maze.width);
       ctx.fillRect(this.px(x) - 3, this.py(y) - 3, 6, 6);
     }
     if (!blink) return;
     for (const key of maze.powerPellets) {
-      if (game.player.eaten.has(key)) continue;
+      if (game.eaten.has(key)) continue;
       const x = key % maze.width;
       const y = Math.floor(key / maze.width);
       ctx.beginPath();
@@ -279,33 +280,43 @@ export class Renderer {
 
   private drawHud(game: Game): void {
     const blink = Math.floor(game.clock * 3) % 2 === 0;
+    const multi = game.players.length > 1;
     game.players.forEach((p, i) => {
       const x = i === 0 ? TILE * 4 : WIDTH - TILE * 4;
-      const isCurrent = i === game.current;
-      if (!isCurrent || blink || game.phase !== 'playing') this.text(`${p.id}UP`, x, TILE * 0.8, '#fff', 16);
+      const color = multi ? HERO_COLORS[i] : '#fff';
+      if (game.isOut(i) && multi) {
+        if (blink) this.text('OUT', x, TILE * 0.8, '#f33', 16);
+      } else if (multi || blink || game.phase !== 'playing') {
+        this.text(`${p.id}UP`, x, TILE * 0.8, color, 16);
+      }
       this.text(String(p.score).padStart(2, '0'), x, TILE * 1.9, '#fff', 16);
     });
     this.text('HIGH SCORE', WIDTH / 2, TILE * 0.8, '#fff', 16);
     this.text(String(game.highScore).padStart(2, '0'), WIDTH / 2, TILE * 1.9, '#fff', 16);
 
-    // Bottom: reserve lives and recent bonus items.
+    // Bottom: reserve lives per player and (one player) recent bonus items.
     const by = HEIGHT - TILE;
-    const reserve = Math.max(0, game.player.lives - 1);
-    for (let i = 0; i < Math.min(reserve, 6); i++) {
-      drawHero(this.ctx, TILE * (1.5 + i * 1.6), by, TILE * 0.6, 'left', 0.5);
-    }
-    const level = game.player.level;
-    const first = Math.max(1, level - 6);
-    for (let l = level, i = 0; l >= first; l--, i++) {
-      drawBonus(this.ctx, levelConfig(l).bonus, WIDTH - TILE * (1.5 + i * 1.6), by, TILE * 0.55);
+    game.players.forEach((p, i) => {
+      const reserve = Math.min(Math.max(0, p.lives - 1), 4);
+      for (let k = 0; k < reserve; k++) {
+        const x = i === 0 ? TILE * (1.5 + k * 1.6) : WIDTH - TILE * (1.5 + k * 1.6);
+        drawHero(this.ctx, x, by, TILE * 0.6, i === 0 ? 'left' : 'right', 0.5, HERO_COLORS[i]);
+      }
+    });
+    const level = game.level;
+    if (!multi) {
+      const first = Math.max(1, level - 6);
+      for (let l = level, i = 0; l >= first; l--, i++) {
+        drawBonus(this.ctx, levelConfig(l).bonus, WIDTH - TILE * (1.5 + i * 1.6), by, TILE * 0.55);
+      }
     }
     this.text(`LEVEL ${level}`, WIDTH / 2, by - 7, '#aaa', 11);
     this.text(game.maze.name.toUpperCase(), WIDTH / 2, by + 9, game.maze.wallColor, 9);
   }
 
-  /** Like the arcades: the player banner shows first, then the chasers appear. */
+  /** Like the arcades: the banner shows first at the start of a game, then the chasers appear. */
   private showPlayerBanner(game: Game): boolean {
-    return game.phase === 'ready' && (game.players.length > 1 || game.phaseTimer > 2) && game.phaseTimer > 1.2;
+    return game.phase === 'ready' && game.phaseTimer > 2;
   }
 
   private drawMessages(game: Game): void {
@@ -317,14 +328,11 @@ export class Renderer {
 
     if (game.phase === 'ready') {
       if (this.showPlayerBanner(game)) {
-        this.text(`PLAYER ${game.player.id === 1 ? 'ONE' : 'TWO'}`, midX, aboveHouse, '#3ef', 18);
+        this.text(multi ? '2 PLAYERS' : 'PLAYER ONE', midX, aboveHouse, '#3ef', 18);
       }
       this.text('READY!', midX, belowHouse, '#ff0', 18);
     }
-    if (game.phase === 'turnOver' || game.phase === 'gameOver') {
-      if (game.phase === 'turnOver' || multi) {
-        this.text(`PLAYER ${game.player.id === 1 ? 'ONE' : 'TWO'}`, midX, aboveHouse, '#3ef', 18);
-      }
+    if (game.phase === 'gameOver') {
       this.text('GAME  OVER', midX, belowHouse, '#f33', 18);
     }
     if (game.phase === 'levelClear' && game.phaseTimer > 1.4) {

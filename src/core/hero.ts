@@ -11,13 +11,13 @@ export interface Hero extends Mover {
   travelled: number;
 }
 
-export function createHero(maze: Maze): Hero {
+export function createHero(maze: Maze, offsetX = 0, facing: Dir = 'left'): Hero {
   return {
-    x: maze.heroStart.x,
+    x: maze.heroStart.x + offsetX,
     y: maze.heroStart.y,
     dir: 'none',
-    queued: 'left',
-    facing: 'left',
+    queued: facing,
+    facing,
     travelled: 0,
   };
 }

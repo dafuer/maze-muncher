@@ -4,6 +4,8 @@ import type { BonusKind } from '../core/levels';
 import { DIR_VECTORS, type Dir } from '../core/types';
 
 export const HERO_COLOR = '#a6ff3d';
+/** Hero colors per player (player one, player two). */
+export const HERO_COLORS = [HERO_COLOR, '#ff7ad9'] as const;
 const FRIGHT_COLOR = '#3a3f8f';
 const FRIGHT_FLASH = '#e8e8ff';
 
@@ -17,6 +19,7 @@ export function drawHero(
   r: number,
   facing: Dir,
   mouth: number,
+  color: string = HERO_COLOR,
 ): void {
   const angle = ANGLES[facing];
   const open = 0.05 + mouth * 0.75;
@@ -26,7 +29,7 @@ export function drawHero(
   // Mirror when facing left so the eye stays on top.
   if (facing === 'left') ctx.scale(1, -1);
 
-  ctx.fillStyle = HERO_COLOR;
+  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.arc(0, 0, r, open, Math.PI * 2 - open);
@@ -52,13 +55,20 @@ export function drawHero(
 }
 
 /** Death animation: the hero spins and pops into sparks. `t` goes from 0 to 1. */
-export function drawHeroDeath(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, t: number): void {
+export function drawHeroDeath(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  t: number,
+  color: string = HERO_COLOR,
+): void {
   if (t < 0.75) {
     const k = t / 0.75;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(k * Math.PI * 4);
-    ctx.fillStyle = HERO_COLOR;
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     const open = 0.05 + k * (Math.PI - 0.05);
@@ -69,7 +79,7 @@ export function drawHeroDeath(ctx: CanvasRenderingContext2D, cx: number, cy: num
     return;
   }
   const k = (t - 0.75) / 0.25;
-  ctx.strokeStyle = HERO_COLOR;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;

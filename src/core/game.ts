@@ -13,9 +13,9 @@ import { BASE_SPEED, BONUS_POINTS, levelConfig, modeAt, type BonusKind, type Lev
 import { isTunnel, pelletKey, type Maze } from './maze';
 import { mazeForLevel } from './mazes';
 import { tileOf } from './movement';
-import { createRng, type Dir, type Rng, type Vec } from './types';
+import { createRng, distanceSq, type Dir, type Rng, type Vec } from './types';
 
-export type Phase = 'ready' | 'playing' | 'eatPause' | 'dying' | 'levelClear' | 'turnOver' | 'gameOver';
+export type Phase = 'ready' | 'playing' | 'eatPause' | 'dying' | 'levelClear' | 'gameOver';
 
 export type GameEvent =
   | 'intro'
@@ -31,12 +31,8 @@ export type GameEvent =
 export interface PlayerState {
   id: number;
   score: number;
-  /** Lives including the one in play. */
+  /** Lives including the one in play; 0 means the player is out. */
   lives: number;
-  level: number;
-  /** Keys of pellets (and power pellets) already eaten on the current level. */
-  eaten: Set<number>;
-  levelDots: number;
   extraLifeGiven: boolean;
 }
 
@@ -65,7 +61,15 @@ export const PHASE_DURATION = {
   eatPause: 0.6,
   dying: 2.4,
   levelClear: 2.6,
-  turnOver: 2.5,
+};
+
+/** Spawn offset (in tiles from the maze hero start) and initial facing per player. */
+const SPAWNS: Record<number, readonly { dx: number; facing: Dir }[]> = {
+  1: [{ dx: 0, facing: 'left' }],
+  2: [
+    { dx: -1, facing: 'left' },
+    { dx: 1, facing: 'right' },
+  ],
 };
 
 const RELEASE_ORDER: readonly ChaserKind[] = ['zap', 'flux', 'glitch'];
@@ -83,14 +87,22 @@ export interface GameOptions {
   startLevel?: number;
 }
 
+/**
+ * One game session. With two players both heroes share the maze at the same
+ * time (co-op): pellets and level are shared, score and lives are per player.
+ */
 export class Game {
   readonly players: PlayerState[];
-  current = 0;
+  /** Heroes, indexed like `players`. Heroes of players who are out stay idle and hidden. */
+  heroes: Hero[] = [];
   phase: Phase = 'ready';
   phaseTimer = PHASE_DURATION.intro;
+  level: number;
+  /** Keys of pellets (and power pellets) already eaten on the current level. */
+  eaten = new Set<number>();
+  levelDots = 0;
   maze!: Maze;
   config!: LevelConfig;
-  hero!: Hero;
   chasers: Chaser[] = [];
   mode: GlobalMode = 'scatter';
   modeElapsed = 0;
@@ -99,6 +111,10 @@ export class Game {
   bonus: ActiveBonus | null = null;
   popups: Popup[] = [];
   highScore: number;
+  /** Hero caught during the current 'dying' phase. */
+  dyingHero = -1;
+  /** Hero that ate a chaser during the current 'eatPause' phase. */
+  eaterHero = -1;
   /** Elapsed time for animations. */
   clock = 0;
   private events: GameEvent[] = [];
@@ -110,23 +126,16 @@ export class Game {
   constructor(numPlayers: 1 | 2, options: GameOptions = {}) {
     this.rng = options.rng ?? createRng(Date.now());
     this.highScore = options.highScore ?? 0;
-    const startLevel = options.startLevel ?? 1;
+    this.level = options.startLevel ?? 1;
     this.players = Array.from({ length: numPlayers }, (_, i) => ({
       id: i + 1,
       score: 0,
       lives: START_LIVES,
-      level: startLevel,
-      eaten: new Set<number>(),
-      levelDots: 0,
       extraLifeGiven: false,
     }));
     this.startRound(false);
     this.phaseTimer = PHASE_DURATION.intro;
     this.events.push('intro');
-  }
-
-  get player(): PlayerState {
-    return this.players[this.current];
   }
 
   /** Returns and clears the events produced since the last call. */
@@ -136,26 +145,36 @@ export class Game {
     return out;
   }
 
+  isOut(playerIndex: number): boolean {
+    return this.players[playerIndex].lives <= 0;
+  }
+
+  /** Indices of heroes currently in play. */
+  activeHeroIndices(): number[] {
+    return this.players.flatMap((_, i) => (this.isOut(i) ? [] : [i]));
+  }
+
   remainingPellets(): number {
     const total = this.maze.pellets.size + this.maze.powerPellets.size;
-    return total - this.player.eaten.size;
+    return total - this.eaten.size;
   }
 
   hasPellet(x: number, y: number): boolean {
     const key = pelletKey(this.maze, x, y);
-    return this.maze.pellets.has(key) && !this.player.eaten.has(key);
+    return this.maze.pellets.has(key) && !this.eaten.has(key);
   }
 
   hasPowerPellet(x: number, y: number): boolean {
     const key = pelletKey(this.maze, x, y);
-    return this.maze.powerPellets.has(key) && !this.player.eaten.has(key);
+    return this.maze.powerPellets.has(key) && !this.eaten.has(key);
   }
 
   bonusPosition(): Vec {
     return { x: this.maze.door.x, y: this.maze.door.y + 5 };
   }
 
-  update(dt: number, input: Dir): void {
+  /** `inputs[i]` is the direction requested by player i ('none' or missing = no change). */
+  update(dt: number, inputs: readonly Dir[]): void {
     this.clock += dt;
     this.popups = this.popups.filter((p) => (p.timer -= dt) > 0);
 
@@ -173,13 +192,10 @@ export class Game {
       case 'levelClear':
         if ((this.phaseTimer -= dt) <= 0) this.nextLevel();
         return;
-      case 'turnOver':
-        if ((this.phaseTimer -= dt) <= 0) this.switchToNextAlivePlayer();
-        return;
       case 'gameOver':
         return;
       case 'playing':
-        this.tick(dt, input);
+        this.tick(dt, inputs);
         return;
     }
   }
@@ -187,10 +203,10 @@ export class Game {
   // ---------------------------------------------------------------- round flow
 
   private startRound(afterDeath: boolean): void {
-    const p = this.player;
-    this.maze = mazeForLevel(p.level);
-    this.config = levelConfig(p.level);
-    this.hero = createHero(this.maze);
+    this.maze = mazeForLevel(this.level);
+    this.config = levelConfig(this.level);
+    const spawns = SPAWNS[this.players.length];
+    this.heroes = spawns.map((s) => createHero(this.maze, s.dx, s.facing));
     this.chasers = createChasers(this.maze);
     this.mode = 'scatter';
     this.modeElapsed = 0;
@@ -200,6 +216,8 @@ export class Game {
     this.popups = [];
     this.roundDots = 0;
     this.idleTimer = 0;
+    this.dyingHero = -1;
+    this.eaterHero = -1;
     this.useGlobalRelease = afterDeath;
     this.phase = 'ready';
     this.phaseTimer = PHASE_DURATION.ready;
@@ -207,54 +225,29 @@ export class Game {
   }
 
   private nextLevel(): void {
-    const p = this.player;
-    p.level += 1;
-    p.eaten = new Set();
-    p.levelDots = 0;
+    this.level += 1;
+    this.eaten = new Set();
+    this.levelDots = 0;
     this.startRound(false);
   }
 
   private afterDeath(): void {
-    const p = this.player;
-    p.lives -= 1;
-    if (this.players.every((pl) => pl.lives <= 0)) {
+    const p = this.players[this.dyingHero];
+    if (p) p.lives -= 1;
+    if (this.activeHeroIndices().length === 0) {
       this.phase = 'gameOver';
       this.events.push('gameOver');
-      return;
-    }
-    if (p.lives <= 0) {
-      // This player is out but the other one is still alive.
-      this.phase = 'turnOver';
-      this.phaseTimer = PHASE_DURATION.turnOver;
-      return;
-    }
-    if (this.players.length > 1) {
-      this.switchToNextAlivePlayer();
       return;
     }
     this.startRound(true);
   }
 
-  private switchToNextAlivePlayer(): void {
-    const n = this.players.length;
-    for (let step = 1; step <= n; step++) {
-      const idx = (this.current + step) % n;
-      if (this.players[idx].lives > 0) {
-        const samePlayer = idx === this.current;
-        this.current = idx;
-        this.startRound(samePlayer);
-        return;
-      }
-    }
-    this.phase = 'gameOver';
-    this.events.push('gameOver');
-  }
-
   // ---------------------------------------------------------------- simulation
 
-  private tick(dt: number, input: Dir): void {
+  private tick(dt: number, inputs: readonly Dir[]): void {
     const cfg = this.config;
-    steerHero(this.hero, input);
+    const active = this.activeHeroIndices();
+    active.forEach((i) => steerHero(this.heroes[i], inputs[i] ?? 'none'));
 
     // Global scatter/chase clock pauses while chasers are frightened.
     if (this.frightTimer > 0) {
@@ -273,38 +266,56 @@ export class Game {
     }
 
     const heroSpeed = this.frightTimer > 0 ? cfg.heroFrightSpeed : cfg.heroSpeed;
-    moveHero(this.maze, this.hero, heroSpeed * dt);
-    this.eatAtHero();
-    if (this.phase !== 'playing') return;
+    for (const i of active) {
+      moveHero(this.maze, this.heroes[i], heroSpeed * dt);
+      this.eatAtHero(i);
+      if (this.phase !== 'playing') return;
+    }
 
     this.idleTimer += dt;
-    if (this.idleTimer >= (this.player.level < 5 ? 4 : 3)) {
+    if (this.idleTimer >= (this.level < 5 ? 4 : 3)) {
       this.idleTimer = 0;
       const next = this.nextInHouse();
       if (next) releaseChaser(next);
     }
 
-    const ctx = this.chaseContext();
-    for (const c of this.chasers) updateChaser(c, ctx, this.chaserSpeed(c) * dt);
+    for (const c of this.chasers) updateChaser(c, this.chaseContextFor(c), this.chaserSpeed(c) * dt);
     this.checkCollisions();
 
     if (this.bonus && (this.bonus.timer -= dt) <= 0) this.bonus = null;
   }
 
   private moveEatenChasers(dt: number): void {
-    const ctx = this.chaseContext();
     for (const c of this.chasers) {
-      if (c.state === 'eaten' || c.state === 'entering') updateChaser(c, ctx, this.chaserSpeed(c) * dt);
+      if (c.state === 'eaten' || c.state === 'entering') {
+        updateChaser(c, this.chaseContextFor(c), this.chaserSpeed(c) * dt);
+      }
     }
   }
 
-  private chaseContext(): ChaseContext {
-    const bolt = this.chasers.find((c) => c.kind === 'bolt')!;
+  /** The active hero closest to a position (each chaser hunts the nearest one). */
+  private nearestHero(pos: Vec): Hero {
+    const active = this.activeHeroIndices();
+    let best = this.heroes[active[0] ?? 0];
+    let bestDist = Infinity;
+    for (const i of active) {
+      const d = distanceSq(this.heroes[i], pos);
+      if (d < bestDist) {
+        bestDist = d;
+        best = this.heroes[i];
+      }
+    }
+    return best;
+  }
+
+  chaseContextFor(c: Chaser): ChaseContext {
+    const bolt = this.chasers.find((ch) => ch.kind === 'bolt')!;
+    const prey = this.nearestHero(c);
     return {
       maze: this.maze,
       mode: this.mode,
-      heroTile: tileOf(this.hero),
-      heroFacing: this.hero.facing,
+      heroTile: tileOf(prey),
+      heroFacing: prey.facing,
       boltTile: tileOf(bolt),
       enraged: this.rageLevel() > 0,
       rng: this.rng,
@@ -329,25 +340,24 @@ export class Game {
     return cfg.chaserSpeed;
   }
 
-  private eatAtHero(): void {
-    const tile = tileOf(this.hero);
+  private eatAtHero(heroIndex: number): void {
+    const tile = tileOf(this.heroes[heroIndex]);
     if (tile.x < 0 || tile.x >= this.maze.width) return;
     const key = pelletKey(this.maze, tile.x, tile.y);
-    const p = this.player;
 
-    if (!p.eaten.has(key) && (this.maze.pellets.has(key) || this.maze.powerPellets.has(key))) {
-      p.eaten.add(key);
-      p.levelDots += 1;
+    if (!this.eaten.has(key) && (this.maze.pellets.has(key) || this.maze.powerPellets.has(key))) {
+      this.eaten.add(key);
+      this.levelDots += 1;
       this.roundDots += 1;
       this.idleTimer = 0;
       if (this.maze.powerPellets.has(key)) {
-        this.addScore(POWER_POINTS);
+        this.addScore(heroIndex, POWER_POINTS);
         this.energize();
       } else {
-        this.addScore(PELLET_POINTS);
+        this.addScore(heroIndex, PELLET_POINTS);
         this.events.push('chomp');
       }
-      if ((BONUS_DOTS as readonly number[]).includes(p.levelDots)) {
+      if ((BONUS_DOTS as readonly number[]).includes(this.levelDots)) {
         this.bonus = { kind: this.config.bonus, pos: this.bonusPosition(), timer: 9.5 };
       }
       this.releaseByDots();
@@ -361,7 +371,7 @@ export class Game {
 
     if (this.bonus && tile.x === this.bonus.pos.x && tile.y === this.bonus.pos.y) {
       const points = BONUS_POINTS[this.bonus.kind];
-      this.addScore(points);
+      this.addScore(heroIndex, points);
       this.popups.push({ x: tile.x, y: tile.y, text: String(points), timer: 2 });
       this.bonus = null;
       this.events.push('bonus');
@@ -392,7 +402,7 @@ export class Game {
     while (next) {
       const ready = this.useGlobalRelease
         ? this.roundDots >= GLOBAL_RELEASE_DOTS[next.kind]
-        : this.player.levelDots >= personalReleaseDots(this.player.level, next.kind);
+        : this.levelDots >= personalReleaseDots(this.level, next.kind);
       if (!ready) return;
       releaseChaser(next);
       next = this.nextInHouse();
@@ -400,31 +410,36 @@ export class Game {
   }
 
   private checkCollisions(): void {
-    for (const c of this.chasers) {
-      if (c.state !== 'active') continue;
-      if (Math.abs(c.x - this.hero.x) > 0.6 || Math.abs(c.y - this.hero.y) > 0.6) continue;
-      if (c.frightened) {
-        this.combo += 1;
-        const points = 200 * 2 ** (this.combo - 1);
-        this.addScore(points);
-        c.state = 'eaten';
-        c.frightened = false;
-        this.popups.push({ x: c.x, y: c.y, text: String(points), timer: 1.2 });
-        this.events.push('eatChaser');
-        this.phase = 'eatPause';
-        this.phaseTimer = PHASE_DURATION.eatPause;
+    for (const i of this.activeHeroIndices()) {
+      const hero = this.heroes[i];
+      for (const c of this.chasers) {
+        if (c.state !== 'active') continue;
+        if (Math.abs(c.x - hero.x) > 0.6 || Math.abs(c.y - hero.y) > 0.6) continue;
+        if (c.frightened) {
+          this.combo += 1;
+          const points = 200 * 2 ** (this.combo - 1);
+          this.addScore(i, points);
+          c.state = 'eaten';
+          c.frightened = false;
+          this.popups.push({ x: c.x, y: c.y, text: String(points), timer: 1.2 });
+          this.events.push('eatChaser');
+          this.eaterHero = i;
+          this.phase = 'eatPause';
+          this.phaseTimer = PHASE_DURATION.eatPause;
+          return;
+        }
+        this.dyingHero = i;
+        this.phase = 'dying';
+        this.phaseTimer = PHASE_DURATION.dying;
+        this.bonus = null;
+        this.events.push('death');
         return;
       }
-      this.phase = 'dying';
-      this.phaseTimer = PHASE_DURATION.dying;
-      this.bonus = null;
-      this.events.push('death');
-      return;
     }
   }
 
-  private addScore(points: number): void {
-    const p = this.player;
+  private addScore(playerIndex: number, points: number): void {
+    const p = this.players[playerIndex];
     p.score += points;
     if (!p.extraLifeGiven && p.score >= EXTRA_LIFE_SCORE) {
       p.extraLifeGiven = true;

@@ -39,7 +39,7 @@ function startGame(players: 1 | 2): void {
   screen = 'game';
   paused = false;
   gameOverTimer = 0;
-  input.clearDirection();
+  input.clearDirections();
 }
 
 function backToTitle(): void {
@@ -78,11 +78,11 @@ function step(): void {
   }
   if (paused) return;
 
-  game.update(STEP, input.direction());
+  game.update(STEP, input.directions(game.players.length as 1 | 2));
   for (const e of game.drainEvents()) sound.play(e);
 
   // Forget the held direction whenever a new round is about to start.
-  if (game.phase === 'ready' && lastPhase !== 'ready') input.clearDirection();
+  if (game.phase === 'ready' && lastPhase !== 'ready') input.clearDirections();
   lastPhase = game.phase;
 
   if (game.phase === 'gameOver') {

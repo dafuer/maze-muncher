@@ -5,7 +5,7 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 
 - S1: "quiero que programes un nuevo comecocos desde 0" — new project from scratch in `comecocos/`.
 - S2: "Quiero que sea en 2D y sobre un navegador" — 2D, runs in the browser. Stack: TypeScript + Vite + Canvas 2D + Web Audio, Vitest for logic.
-- S3: "Tiene que poder jugar 1 o dos personas" — 1 or 2 players (alternating turns, arcade style; separate score, lives, level and pellet state).
+- S3: "Tiene que poder jugar 1 o dos personas" + "a dos jugadores quiero que salgan dos pacman a la vez y se pueda jugar a la vez las dos personas." — 1 or 2 players; in 2-player mode both heroes are on screen at the same time (simultaneous co-op): P1 arrows/swipe, P2 WASD, shared maze and level, separate score and lives, chasers target the nearest hero; a catch costs that player a life and restarts the round; a player with no lives is out; game over when both are out. (Assumptions: control keys, co-op rules.)
 - S4: "tiene que haber varias pantallas segun las vamos pasando" — multiple levels and several distinct mazes that rotate as levels are cleared.
 - S5: "Lo más similar al juego original posible" — same genre mechanics: pellets, power pellets, 4 chasers with distinct targeting (chase/ambush/flank/shy), scatter/chase schedule, frightened mode with combo scoring, ghost house + release, side tunnel, bonus items, extra life, lives, level speed/fright scaling, ready/death/level-clear/game-over screens, high score. Assumption: original names, characters, mazes, art and sounds (no recreation of a specific existing game's IP).
 - S6: "de manera autonoma sin pedir permiso hasta el final (una versión jugable)" — deliver a playable version before asking anything.
@@ -19,8 +19,11 @@ Branch: feat/maze-chase · Delivery: single-pr (local, user decides push/PR) · 
 - T5 [S2,S5,S6] Renderer, audio, input, screens, app loop — inline — done (build ok; browser smoke: title, 2P start, movement, death, level clear → Candy Circuit, level 6 → Ember Forge, fright; no console errors)
 - T6 [S6] README + final verification (build, tests, browser smoke) — inline — done (README; 47 tests, tsc, build green)
 
+- T7 [S3] Simultaneous 2-player mode (replaces alternating turns) — inline — done (RED: 15 failing → GREEN 53/53; browser smoke: two heroes, independent arrows/WASD control, P2 death only cost P2 a life)
+
 ## Log
 
 - L1 (2026-11-14) User request verbatim: "quiero que programes un nuevo comecocos desde 0. Quiero que uses gentle-ai pero quiero que lo hagas de manera autonoma sin pedir permiso hasta el final (una versión jugable). Quiero que sea en 2D y sobre un navegador: ¿qué tecnología y librerías propones? Tiene que poder jugar 1 o dos personas. Además tiene que haber varias pantallas segun las vamos pasando. Lo más similar al juego original posible."
 - L2 Decision: no game engine; pure core logic in `src/core` (testable, deterministic RNG injected), rendering/audio/input adapters around it.
 - L3 Verification: `npm test` 47/47, `tsc --noEmit` clean, `vite build` ok; manual browser smoke via Chrome on dev server. Not covered by automated tests: rendering, audio, input (manual only).
+- L4 (2026-11-14) User correction verbatim: "a dos jugadores quiero que salgan dos pacman a la vez y se pueda jugar a la vez las dos personas." → S3 rewritten, T7 opened.

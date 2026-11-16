@@ -127,6 +127,9 @@ export class Sound {
       case 'gameOver':
         this.tone(330, now, 0.3, 'triangle', 0.25, 110);
         break;
+      case 'victory':
+        this.melody(LEVEL_CLEAR, 'square', 0.22);
+        break;
     }
   }
 

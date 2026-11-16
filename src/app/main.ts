@@ -7,6 +7,7 @@ import { loadHighScore, saveHighScore } from './highscore';
 
 const STEP = 1 / 60;
 const GAME_OVER_HOLD = 4;
+const VICTORY_HOLD = 14;
 
 type Screen = 'title' | 'game';
 
@@ -86,9 +87,9 @@ function step(): void {
   if (game.phase === 'ready' && lastPhase !== 'ready') input.clearDirections();
   lastPhase = game.phase;
 
-  if (game.phase === 'gameOver') {
+  if (game.phase === 'gameOver' || game.phase === 'victory') {
     gameOverTimer += STEP;
-    if (gameOverTimer >= GAME_OVER_HOLD) backToTitle();
+    if (gameOverTimer >= (game.phase === 'victory' ? VICTORY_HOLD : GAME_OVER_HOLD)) backToTitle();
   }
 }
 

@@ -15,7 +15,7 @@ import { mazeForLevel } from './mazes';
 import { tileOf } from './movement';
 import { createRng, distanceSq, type Dir, type Rng, type Vec } from './types';
 
-export type Phase = 'ready' | 'playing' | 'eatPause' | 'dying' | 'levelClear' | 'gameOver';
+export type Phase = 'ready' | 'playing' | 'eatPause' | 'dying' | 'levelClear' | 'gameOver' | 'victory';
 
 export type GameEvent =
   | 'intro'
@@ -26,7 +26,8 @@ export type GameEvent =
   | 'death'
   | 'extraLife'
   | 'levelClear'
-  | 'gameOver';
+  | 'gameOver'
+  | 'victory';
 
 /** Why the current round started: drives the banner shown during 'ready'. */
 export type RoundKind = 'gameStart' | 'newLevel' | 'retry';
@@ -56,6 +57,8 @@ export const START_LIVES = 3;
 export const EXTRA_LIFE_SCORE = 10_000;
 export const PELLET_POINTS = 10;
 export const POWER_POINTS = 50;
+/** Clearing this level wins the game. */
+export const FINAL_LEVEL = 9;
 export const BONUS_DOTS = [70, 170] as const;
 
 export const PHASE_DURATION = {
@@ -197,6 +200,7 @@ export class Game {
         if ((this.phaseTimer -= dt) <= 0) this.nextLevel();
         return;
       case 'gameOver':
+      case 'victory':
         return;
       case 'playing':
         this.tick(dt, inputs);
@@ -232,6 +236,11 @@ export class Game {
   }
 
   private nextLevel(): void {
+    if (this.level >= FINAL_LEVEL) {
+      this.phase = 'victory';
+      this.events.push('victory');
+      return;
+    }
     this.level += 1;
     this.eaten = new Set();
     this.levelDots = 0;

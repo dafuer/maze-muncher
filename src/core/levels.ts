@@ -61,10 +61,10 @@ function scheduleFor(level: number): number[] {
 export function levelConfig(level: number): LevelConfig {
   const lvl = Math.max(1, Math.floor(level));
   let speeds: [number, number, number, number, number];
-  if (lvl === 1) speeds = [0.8, 0.9, 0.75, 0.5, 0.4];
-  else if (lvl <= 4) speeds = [0.9, 0.95, 0.85, 0.55, 0.45];
-  else if (lvl <= 20) speeds = [1, 1, 0.95, 0.6, 0.5];
-  else speeds = [0.9, 0.9, 0.95, 0.6, 0.5];
+  // Speeds rise in blocks of three levels: 1-3, 4-6, 7 onwards.
+  if (lvl <= 3) speeds = [0.8, 0.9, 0.75, 0.5, 0.4];
+  else if (lvl <= 6) speeds = [0.9, 0.95, 0.85, 0.55, 0.45];
+  else speeds = [1, 1, 0.95, 0.6, 0.5];
   const [hero, heroFright, chaser, chaserFright, tunnel] = speeds;
   return {
     level: lvl,

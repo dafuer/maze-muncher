@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { currentTarget } from '../src/core/chaser';
-import { EXTRA_LIFE_SCORE, Game, PHASE_DURATION, START_LIVES } from '../src/core/game';
+import { EXTRA_LIFE_SCORE, FINAL_LEVEL, Game, PHASE_DURATION, START_LIVES } from '../src/core/game';
 import { pelletKey } from '../src/core/maze';
 import { MAZES } from '../src/core/mazes';
 import { createRng, type Dir } from '../src/core/types';
@@ -134,6 +134,23 @@ describe('game flow', () => {
     expect(game.eaten.size).toBe(0);
     expect(game.maze).toBe(MAZES[2]);
     expect(game.roundKind).toBe('newLevel');
+  });
+
+  it('shows the victory screen instead of a new level after clearing the final level', () => {
+    expect(FINAL_LEVEL).toBe(9);
+    const game = newGame(1, FINAL_LEVEL);
+    untilPlaying(game);
+    const keep = pelletKey(game.maze, game.maze.heroStart.x - 1, game.maze.heroStart.y);
+    eatAllPelletsBut(game, keep);
+    run(game, 0.1, 'left');
+    expect(game.phase).toBe('levelClear');
+    game.drainEvents();
+    run(game, PHASE_DURATION.levelClear + 0.1);
+    expect(game.phase).toBe('victory');
+    expect(game.level).toBe(FINAL_LEVEL);
+    expect(game.drainEvents()).toContain('victory');
+    run(game, 5, 'left');
+    expect(game.phase).toBe('victory');
   });
 
   it('announces a new level with a longer ready phase, but not after a death', () => {

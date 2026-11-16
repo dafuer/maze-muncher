@@ -188,6 +188,10 @@ export class Renderer {
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     this.drawHud(game);
+    if (game.phase === 'victory') {
+      this.drawVictory(game);
+      return;
+    }
 
     const flashWhite =
       game.phase === 'levelClear' && game.phaseTimer < 2 && Math.floor(game.phaseTimer * 4) % 2 === 0;
@@ -312,6 +316,66 @@ export class Renderer {
     }
     this.text(`LEVEL ${level}`, WIDTH / 2, by - 7, '#aaa', 11);
     this.text(game.maze.name.toUpperCase(), WIDTH / 2, by + 9, game.maze.wallColor, 9);
+  }
+
+  /**
+   * Victory screen: a looping cartoon where the hero turns the tables, gobbles
+   * the frightened drones one by one (with growing scores) and burps.
+   */
+  private drawVictory(game: Game): void {
+    const ctx = this.ctx;
+    const t = game.clock;
+    for (let i = 0; i < 40; i++) {
+      // Confetti.
+      const x = (i * 97 + t * 40 * ((i % 3) + 1)) % WIDTH;
+      const y = (i * 53 + t * 90 * ((i % 4) + 1)) % HEIGHT;
+      ctx.fillStyle = `hsl(${(i * 37 + t * 120) % 360},100%,60%)`;
+      ctx.fillRect(x, y, 5, 9);
+    }
+
+    const title = 'CONGRATULATIONS!';
+    ctx.font = `28px ${FONT}`;
+    let x = WIDTH / 2 - ctx.measureText(title).width / 2;
+    for (let i = 0; i < title.length; i++) {
+      const ch = title[i];
+      const w = ctx.measureText(ch).width;
+      this.text(ch, x + w / 2, TILE * 6 + Math.sin(t * 4 + i * 0.6) * 8, `hsl(${(i * 22 + t * 90) % 360},100%,60%)`, 28);
+      x += w;
+    }
+    this.text(`YOU BEAT ALL ${game.level} LEVELS`, WIDTH / 2, TILE * 9, '#fff', 14);
+    this.text('THE DRONES NEVER STOOD A CHANCE', WIDTH / 2, TILE * 10.5, '#9cf', 11);
+
+    // 6-second loop: drones flee, the hero chases and eats them, then a burp.
+    const loop = t % 6;
+    const runY = TILE * 17;
+    const size = TILE * 1.3;
+    const heroX = -TILE * 3 + Math.min(loop / 4.5, 1) * (WIDTH + TILE * 2);
+    const chomp = Math.abs(Math.sin(t * 14));
+    CHASER_KINDS.forEach((kind, i) => {
+      const startX = TILE * (9 + i * 4.5);
+      const droneX = startX + loop * TILE * 0.7 + Math.sin(t * 10 + i) * 4;
+      const eaten = heroX >= droneX - TILE * 0.5;
+      const fake = { kind, state: 'active', frightened: true, homeX: i, x: 0, y: 0, dir: 'right', target: { x: 0, y: 0 } } as Chaser;
+      if (!eaten) {
+        drawChaser(ctx, fake, droneX, runY - Math.abs(Math.sin(t * 9 + i)) * 10, size * 0.85, t, 99);
+      } else if (heroX - droneX < TILE * 5) {
+        this.text(`${200 * 2 ** i}`, droneX, runY - TILE * 1.6 - (heroX - droneX) * 0.3, '#3ef', 14);
+      }
+    });
+    if (loop < 4.6) {
+      drawHero(ctx, heroX, runY, size, 'right', chomp);
+    } else {
+      // Fat, happy hero sitting in the middle.
+      const bounce = Math.abs(Math.sin(t * 6)) * 6;
+      drawHero(ctx, WIDTH / 2, runY - bounce, size * 1.5, 'left', 0.3);
+      if (loop > 5) this.text('*BURP*', WIDTH / 2 + TILE * 3, runY - TILE * 2.2, '#ff0', 16);
+    }
+
+    const multi = game.players.length > 1;
+    game.players.forEach((p, i) => {
+      const label = multi ? `PLAYER ${i + 1}  ${p.score}` : `SCORE  ${p.score}`;
+      this.text(label, WIDTH / 2, TILE * (22 + i * 1.6), HERO_COLORS[i] ?? HERO_COLOR, 16);
+    });
   }
 
   /** The banner shows first at the start of a game or level, then the chasers appear. */

@@ -38,7 +38,8 @@ out and the other keeps playing; the game ends when both are out.
 - Extra life at 10,000 pts. You start with 3 lives.
 - Side tunnels wrap around and slow the drones down.
 - Every cleared level loads a new maze (Neon Grid → Candy Circuit → Ember Forge →
-  and around again), and each level is faster with shorter power time.
+  and around again). Speed rises every three levels (1-3, 4-6, 7-9) and power
+  time gets shorter. Clearing level 9 wins the game and plays a victory screen.
 
 ### The drones
 
